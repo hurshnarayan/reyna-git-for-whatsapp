@@ -1,0 +1,11 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', -apple-system, sans-serif; color: #222; background: #fff; }
+::selection { background: #25D366; color: #fff; }
+a { text-decoration: none; color: inherit; }
+code { font-family: 'JetBrains Mono', monospace; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.fade-in { animation: fadeIn 0.4s ease both; }
