@@ -1,8 +1,8 @@
-# Reyna — Git for your WhatsApp Group
+# Reyna - Git for your WhatsApp Group
 
 > Your semester's notes, versioned, searchable, never lost.
 
-India has 40,000+ engineering colleges. Every single one runs on WhatsApp groups. Notes, assignments, PYQs — shared, buried, and lost forever under memes and good morning messages.
+India has 40,000+ engineering colleges. Every single one runs on WhatsApp groups. Notes, assignments, PYQs - shared, buried, and lost forever under memes and good morning messages.
 
 **Reyna is a WhatsApp bot that treats your group chat like a Git repository.** She stages files, commits them to Google Drive, and responds with enough desi sass to keep the group entertained.
 
