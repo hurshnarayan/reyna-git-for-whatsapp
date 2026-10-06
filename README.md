@@ -1,251 +1,308 @@
-# Reyna - Git for your WhatsApp Group
+# Reyna — The Sovereign Document Archive
 
-> Your semester's notes, versioned, searchable, never lost.
+> **"The file you need is already on your phone."**  
+> Zero-upload, privacy-first personal document system. Turns chaotic WhatsApp chats into a self-filing, searchable digital library.
 
-India has 40,000+ engineering colleges. Every single one runs on WhatsApp groups. Notes, assignments, PYQs - shared, buried, and lost forever under memes and good morning messages.
+Built for **Smart India Hackathon 2026** (Problem Statement ID: `SIH260150`, Theme: Smart Education) and designed for anyone who manages life and work over WhatsApp.
 
-**Reyna is a WhatsApp bot that treats your group chat like a Git repository.** She stages files, commits them to Google Drive, and responds with enough desi sass to keep the group entertained.
+---
+
+## The Problem: Where Critical Documents Die
+
+Over **three billion people** run their daily lives on WhatsApp. 
+
+Inside those chats live the most vital documents of modern existence:
+- Flight and train tickets
+- Hospital discharge summaries and medical prescriptions
+- Tax receipts and GST invoices
+- Rent agreements and landlord receipts
+- College lecture notes and previous-year question papers (PYQs)
+- Freelance contracts and salary vouchers
+
+**Two days pass.** What happens?  
+Buried alive under ten thousand messages, group banter, memes, and festival greetings.
+
+**When emergency strikes**, panic follows:
+- Standing at airport security with a missing boarding pass
+- Facing a doctor asking for an MRI scan from last year
+- Disputing a deposit with a landlord over a lost receipt
+- Sitting outside an exam hall frantically searching for Module 2 notes
+
+Traditional solutions (Dropbox, Google Drive, OneDrive, university portals) fail because they demand **homework**: download the file, open an app, rename it, pick a folder, add tags, and manually upload. Nobody does homework consistently. Friction kills it. Chats remain document graveyards.
+
+---
+
+## The Solution: Pure Magic, Zero Friction
+
+Reyna flips this model completely:
+
+1. **Zero Manual Upload**  
+   You change zero habits. When someone shares a document in WhatsApp, WhatsApp downloads it to your phone storage (`/Android/media/com.whatsapp/...`). The split second the file lands, Reyna’s background watcher captures it silently. Zero taps required.
+
+2. **Zero Bots Spying in Chats**  
+   No bot phone number ever joins your private groups. Zero risk of WhatsApp phone bans. Zero third parties reading your private chat messages.
+
+3. **Sovereign Personal Cloud Storage**  
+   Captured files stream directly into your **personal Google Drive** (`/Reyna/<Category>/...`). Reyna stores zero files on central servers. You own and control every single byte.
+
+4. **Forensic Attribution Engine ("Never Guess")**  
+   A file saved on phone storage carries no sender name. Reyna reconstructs the author using four forensic signals (arrival timestamps, WhatsApp filename regex, `/Sent/` directory absence, and optional chat export logs).  
+   *Strict 0.70 Confidence Floor:* If confidence is below 70%, Reyna never guesses a person's name. It downgrades gracefully to the group chat name or "Found on your phone".
+
+5. **Instant Conversational Retrieval & Source Verification**  
+   Ask questions in plain English, Hindi, or conversational shorthand:
+   - *"When is my flight to Mumbai departing?"*
+   - *"What was the total on last month's electric bill?"*
+   - *"Show me the rent agreement landlord sent in August."*
+   - *"Who sent that MRI scan?"*  
+   Reyna answers instantly with exact facts, displays a verified sender badge, and renders a `[ 1 source ]` button. Tapping it opens the native in-app document viewer, leaping straight to the cited page and highlighting the exact sentence.
+
+---
+
+## System Architecture
 
 ```
-/reyna add .          → stage the last shared file
-/reyna staged         → see what's waiting
-/reyna commit         → push staged files to Google Drive
-/reyna find "DSA"     → search across everything
-/reyna log            → full history
-/reyna rm notes.pdf   → unstage a file
+┌────────────────────────────────────────────────────────────────────────┐
+│                      📱 CLIENT: NATIVE ANDROID                         │
+│                                                                        │
+│  UI: Single-activity Jetpack Compose (ChatScreen, SourcesSheet)        │
+│  State: ReynaViewModel with immutable StateFlow streams                │
+│  File Capture: Background FileObserver daemon on WhatsApp media dir    │
+│  Local Database: Room SQLite with FTS4 full-text search                │
+│  On-Device OCR: Google Play Services ML Kit Vision Text Recognition    │
+│  Document Viewer: Native Android PdfRenderer (direct page jump)        │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Encrypted HTTPS (Retrofit / OkHttp)
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                      🌐 SECURE GATEWAY / TUNNEL                        │
+│                                                                        │
+│  ngrok permanent reserved domain (stable OAuth redirect + API URL)     │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                      ⚙️ BACKEND ENGINE: GO SERVER                      │
+│                                                                        │
+│  Runtime: Go 1.22+ standalone binary (sub-millisecond execution)       │
+│  Metadata DB: SQLite in WAL mode (pure SQL, store.go, zero ORM)        │
+│  Tokenizer: Unicode UAX #29 (Devanagari, Tamil, Telugu, Arabic)        │
+│  Relevance Scorer: BM25-style whole-word boundary matching             │
+│  Zero-Cost Parser: Pure Go zip + xml for .docx, .pptx, .xlsx (free)    │
+│  Attribution Engine: 4-signal composite confidence scoring             │
+│  Quota Governor: 0.03s fast-fail returning amber Notice cards          │
+└───────────────────────┬────────────────────────┬───────────────────────┘
+                        │                        │
+                        ▼                        ▼
+┌────────────────────────────────┐      ┌────────────────────────────────┐
+│   ☁️ GOOGLE DRIVE API v3        │      │   🧠 GEMINI 2.5 FLASH API      │
+│                                │      │                                │
+│  User's personal Google Drive  │      │  Dynamic query expansion       │
+│  Direct OAuth 2.0 delegation   │      │  768-dim vector embeddings     │
+│  Zero centralized hosting      │      │  Selective self-RAG synthesis  │
+└────────────────────────────────┘      └────────────────────────────────┘
 ```
 
 ---
 
-## How It Works
+## Prerequisites & Toolchain
 
-```
-WhatsApp Group                    Reyna Backend                  Google Drive
-┌──────────────┐                 ┌──────────────┐              ┌──────────────┐
-│ Someone sends│                 │              │              │              │
-│ notes.pdf    │                 │   Go API     │              │  Reyna/      │
-│              │  /reyna add .   │   + SQLite   │  /reyna      │  ├── DSA/    │
-│ ────────────►│────────────────►│   + Sass     │──commit────► │  │  notes.pdf│
-│              │  (file bytes    │              │  (uploads)   │  ├── OS/     │
-│ Bot responds │   via base64)   │  Stores to   │              │  └── CN/    │
-│ with sass 🤖 │◄────────────────│  local +DB   │              │              │
-└──────────────┘                 └──────┬───────┘              └──────────────┘
-                                        │
-                                        │ polls every 5s
-                                        ▼
-                                 ┌──────────────┐
-                                 │  React Web   │
-                                 │  Dashboard   │
-                                 │  :5173       │
-                                 └──────────────┘
-```
+Before firing up Reyna, ensure your development machine has:
 
-### Two Surfaces
-
-| Surface | What it does |
-|---|---|
-| **WhatsApp Bot** | Lives in your group, intercepts `/reyna` commands, downloads files, uploads to Drive |
-| **Web Dashboard** | Browse files, search, see staging area, version history, connect Google Drive |
+- **Go 1.22+** (`brew install go`)
+- **JDK 21** (`brew install temurin@21` or via mise)
+- **Android SDK & adb** (Android Studio command-line tools or `brew install android-platform-tools`)
+- **SQLite 3** (`brew install sqlite3`)
+- **just** command runner (`brew install just`)
+- **ngrok** tunnel client (`brew install ngrok`)
 
 ---
 
-## Commands
+## Quick Start & Fire-Up Guide
 
-| Command | Description |
-|---|---|
-| `/reyna add .` | Stage the last shared file |
-| `/reyna add File.pdf` | Stage a specific file |
-| `/reyna staged` | View staged (uncommitted) files |
-| `/reyna commit` | Commit all staged → Google Drive |
-| `/reyna commit File` | Commit a specific file |
-| `/reyna rm File` | Remove a staged file |
-| `/reyna rm .` | Remove all staged files |
-| `/reyna find "query"` | Search stored files |
-| `/reyna log` | Show file history |
-| `/reyna status` | What's new in the last 24 hours |
-| `/reyna help` | Show commands (with attitude) |
+Everything in Reyna is automated through [`just`](https://github.com/casey/just).
 
----
-
-## Quick Start
-
-### Prerequisites
-
-- Go 1.22+
-- Node.js 20+
-- Google Cloud OAuth credentials (free — [setup guide](#google-drive-setup))
-
-### 1. Clone
+### Step 1: Check Your Environment
+Run the built-in system doctor:
 
 ```bash
-git clone https://github.com/yourusername/reyna-git-for-whatsapp.git
-cd reyna-git-for-whatsapp
+just doctor
 ```
 
-### 2. Configure
+This verifies Go, JDK 21, adb, SQLite3, `.env`, and Android device attachment.
+
+---
+
+### Step 2: Initialize Configuration
+
+Create your `.env` file with generated secrets:
 
 ```bash
-cp .env.example .env
-# Edit .env with your Google OAuth credentials
+just env-init
 ```
 
-### 3. Install
+This generates cryptographic `JWT_SECRET` and `DEVICE_TOKEN` keys inside `.env`.
+
+---
+
+### Step 3: Configure API Keys & Authentication
+
+Open `.env` and fill in the required keys:
+
+#### 1. Gemini API Key (Free)
+1. Go to [Google AI Studio](https://aistudio.google.com/apikey).
+2. Generate a free API key.
+3. In `.env`, set:
+   ```env
+   GEMINI_API_KEY=your-gemini-api-key-here
+   ```
+
+#### 2. Google Cloud OAuth (Google Drive API)
+All free. No billing required.
+1. Visit [console.cloud.google.com](https://console.cloud.google.com).
+2. Create a project named **Reyna**.
+3. Enable the **Google Drive API** (APIs & Services → Library → Search "Google Drive API" → Enable).
+4. Go to **OAuth consent screen**:
+   - User Type: **External**
+   - Fill in App name (`Reyna`) and user support emails.
+   - Under **Test Users**, add your personal Google account email.
+5. Go to **Credentials** → **Create Credentials** → **OAuth Client ID**:
+   - Application Type: **Web Application**
+   - Name: `Reyna Web Client`
+6. Copy the **Client ID** and **Client Secret** into `.env`:
+   ```env
+   GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=your-client-secret
+   ```
+
+#### 3. ngrok Stable Tunnel Domain
+ngrok free tier includes one permanent reserved domain so redirect URLs never break:
+1. Sign up free at [dashboard.ngrok.com](https://dashboard.ngrok.com/signup).
+2. Connect authtoken:
+   ```bash
+   ngrok config add-authtoken <your-ngrok-token>
+   ```
+3. Claim your free reserved domain at [dashboard.ngrok.com/domains](https://dashboard.ngrok.com/domains) (e.g., `reyna-app.ngrok-free.app`).
+4. Set it in `.env` (without `https://`):
+   ```env
+   NGROK_DOMAIN=reyna-app.ngrok-free.app
+   ```
+5. In Google Cloud Console under your OAuth Client ID, add the Authorized Redirect URI:
+   ```
+   https://reyna-app.ngrok-free.app/api/auth/google/callback
+   ```
+
+---
+
+### Step 4: Fire Up the Tunnel & Backend
+
+Start the stable tunnel and backend in one shot:
 
 ```bash
-cd frontend && npm install && cd ..
-cd whatsapp-bot && npm install && cd ..
+just tunnel-up
 ```
 
-### 4. Run (three terminals)
+What this does automatically:
+- Starts ngrok bound to your reserved domain.
+- Updates `GOOGLE_REDIRECT_URL` in `.env`.
+- Builds and starts the Go backend detached in the background on port `8080`.
+- Points `android/local.properties` at the tunnel URL.
+- Confirms backend health via `/api/health`.
+
+To tail backend server logs:
+```bash
+just backend-log
+```
+
+---
+
+### Step 5: Connect Google Drive
+
+Authorize Reyna to back up files to your Drive:
 
 ```bash
-# Terminal 1 — Backend
-cd backend
-source <(grep -v '^#' ../.env | sed 's/^/export /')
-go run ./cmd/server/
-
-# Terminal 2 — Frontend
-cd frontend
-npm run dev
-
-# Terminal 3 — WhatsApp Bot
-cd whatsapp-bot
-node bot.js
-# Scan QR code with WhatsApp → Linked Devices → Link a Device
+just drive-connect
 ```
 
-### 5. Use
-
-1. Open `http://localhost:5173` → Register with your WhatsApp number
-2. Connect Google Drive from the dashboard
-3. In any WhatsApp group the bot is in: share a file → `/reyna add .` → `/reyna commit`
-4. File appears in your Google Drive under `Reyna/` folder
+This opens your browser with Google's OAuth consent screen. Sign in with your test user Google account. Reyna will now automatically route captured documents into your personal Drive.
 
 ---
 
-## Google Drive Setup
+### Step 6: Build and Launch the Android App
 
-All free. No billing needed.
+#### Option A: Running on a Connected Android Device (USB / adb)
+Connect your phone with USB debugging enabled:
 
-1. Go to [console.cloud.google.com](https://console.cloud.google.com)
-2. Create a project called `Reyna`
-3. Enable **Google Drive API** (APIs & Services → Library)
-4. Go to **OAuth consent screen** → External → fill app name + emails → save through all tabs
-5. Add your email as a **Test User**
-6. Go to **Credentials** → Create OAuth Client ID → Web Application
-7. Add redirect URI: `http://localhost:8080/api/auth/google/callback`
-8. Copy Client ID and Client Secret into `.env`
+```bash
+just run
+```
+This compiles the debug APK, installs it onto the device, and launches the app.
+
+#### Option B: Running on Android Emulator
+```bash
+just point-at-emulator
+just run
+```
+
+#### Option C: Build Signed Release APK (To Sideload)
+Generate a local signing key once:
+```bash
+just keygen
+```
+Then build the signed production APK:
+```bash
+just apk-release
+```
+The finished, signed APK is placed at `~/Desktop/reyna.apk`. Send it to your phone via AirDrop, cable, or chat and install.
 
 ---
 
-## Tech Stack
+## Daily Workflow & Useful Commands
 
-| Component | Tech | Cost |
-|---|---|---|
-| Backend | Go + net/http + SQLite (WAL) | Free |
-| Frontend | React 19 + Vite + React Router | Free |
-| WhatsApp | Baileys v7 (WhatsApp Web protocol) | Free |
-| Storage | Google Drive API (15 GB/user) | Free |
-| Auth | JWT (phone-based) + Google OAuth 2.0 | Free |
-
-**Zero paid APIs. Zero vendor lock-in. Your data stays in YOUR Drive.**
-
----
-
-## Project Structure
-
-```
-reyna-git-for-whatsapp/
-├── backend/
-│   ├── cmd/server/main.go           # Entry point
-│   └── internal/
-│       ├── api/handlers.go          # REST API (20+ endpoints)
-│       ├── auth/jwt.go              # JWT + token validation
-│       ├── config/config.go         # Env config
-│       ├── db/store.go              # SQLite (files, users, groups, versions)
-│       ├── gdrive/service.go        # Google Drive OAuth + REST API + local fallback
-│       ├── models/models.go         # All data types
-│       └── reyna/personality.go     # The sass engine 🤖
-├── frontend/
-│   ├── src/
-│   │   ├── main.jsx                 # React entry + router
-│   │   ├── lib/api.js               # API client
-│   │   ├── components/Layout.jsx    # Dashboard sidebar
-│   │   └── pages/
-│   │       ├── Landing.jsx          # Pitch page (Basecamp-style)
-│   │       ├── Login.jsx            # Phone auth
-│   │       ├── Dashboard.jsx        # Stats + Drive connect + live polling
-│   │       ├── Files.jsx            # File browser + staging area + versions
-│   │       ├── Search.jsx           # Full-text search
-│   │       └── BotDemo.jsx          # Interactive bot simulator
-│   ├── index.html
-│   └── vite.config.js
-├── whatsapp-bot/
-│   ├── bot.js                       # Baileys v7 bot + file download + base64 upload
-│   └── package.json
-├── .env.example
-├── .gitignore
-├── Makefile
-└── README.md
-```
+| Task | Command | Description |
+|:---|:---|:---|
+| **System Diagnostics** | `just doctor` | Checks toolchain, env, backend status, and connected devices |
+| **Start Tunnel & Server** | `just tunnel-up` | Launches ngrok tunnel + starts background Go server |
+| **Start Server Foreground** | `just backend` | Runs Go backend in foreground (`:8080`) |
+| **Stop Server** | `just backend-stop` | Cleanly terminates backend without killing tunnels |
+| **Tail Server Logs** | `just backend-log` | Follows `/tmp/reyna-backend.log` |
+| **Clean Reset DB** | `just backend-fresh` | Wipes local SQLite DB and restarts backend |
+| **Run Linter & Tests** | `just check` | Runs `go build`, `go vet`, and package tests |
+| **Build Debug APK** | `just build` | Assembles Android debug APK |
+| **Install & Launch** | `just run` | Builds, installs, and starts Android app on device |
+| **Signed Release APK** | `just apk-release` | Builds signed production APK to `~/Desktop/reyna.apk` |
+| **Stream Device Logs** | `just logs` | Streams Android logcat filtered for `Reyna` |
+| **Check Drive Sync** | `just drive-state` | Shows pending vs uploaded Drive files |
+| **Force Drive Sync** | `just drive-push` | Pushes all staged files to Google Drive immediately |
+| **Test AI Retrieval** | `just ask "question"` | Tests query retrieval and citation from terminal |
 
 ---
 
-## API Endpoints
+## Testing Retrieval From Terminal
 
-### Public
+You can test conversational search right from your terminal without opening the phone:
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/health` | Health check |
-| `POST` | `/api/auth/register` | Register (phone + name) |
-| `POST` | `/api/auth/login` | Login (phone) |
-| `POST` | `/api/bot/command` | WhatsApp bot commands |
-| `POST` | `/api/bot/upload` | WhatsApp bot file upload (base64) |
-| `POST` | `/api/waitlist` | Join beta waitlist |
+```bash
+just ask "When is my flight to Mumbai departing?"
+just ask "Show me the electric bill"
+just ask "Who sent the compiler notes?"
+```
 
-### Protected (Bearer token)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/me` | Current user |
-| `GET` | `/api/dashboard` | Stats, recent files, contributors |
-| `GET` | `/api/files` | List files (with group filter) |
-| `GET` | `/api/files/search?q=` | Full-text search |
-| `GET` | `/api/files/versions?file_id=` | Version history |
-| `GET` | `/api/auth/google/status` | Drive connection status |
-| `GET` | `/api/auth/google/connect` | Get Google OAuth URL |
+Reyna will print the natural language answer along with the cited source files.
 
 ---
 
-## Reyna's Personality
+## Hard Architectural Invariants
 
-She's not just a bot. She's the group's most useful *and most annoying* member.
-
-```
-User: /reyna find "DBMS notes"  (at 3 AM)
-Reyna: Bhai 3 baje raat ko DBMS? Tera breakup hua hai kya? Anyway, 4 results 📂
-
-User: /reyna status  (during exams)
-Reyna: 12 new files. 8 PYQs. Everyone suddenly remembered exams exist 📚😂
-
-User: /reyna help
-Reyna: Main karu toh kya karu — basically save karti hoon.
-       Commands: add, staged, commit, rm, find, log, status.
-       Ab padh le bhai. 📖
-
-User: /reyna commit
-Reyna: Boom! 3 files committed. Ab ye permanent hain.
-       Exam ke time thank karega mujhe 😎
-       ☁️ 3 file(s) pushed to Google Drive!
-```
+1. **Strict 0.70 Attribution Floor:** A raw file on disk has no sender tag. If attribution confidence falls below `0.70`, Reyna **never** guesses a human name. It downgrades to the chat name or device origin.
+2. **Device Identity Isolation:** Files uploaded from Android carry internal ID `device`. The system never attributes `device` as a human author.
+3. **Whole-Word Matching Only:** Search matching uses whole-word boundaries. Substrings are forbidden (searching "OS" never matches "hospital").
+4. **Zero-Cost Office File Parsing:** `.docx`, `.pptx`, and `.xlsx` files are parsed locally via Go stdlib `archive/zip` and `encoding/xml`. Only PDFs incur LLM processing calls.
+5. **Fast-Fail Quota Wall:** When Gemini free-tier allowance runs low, the backend returns an amber Notice card in `0.03s` with the reset time, rather than stalling or hanging.
+6. **Sovereignty First:** All user files belong in the user's personal Google Drive. Zero centralized storage liabilities.
 
 ---
 
 ## License
 
-MIT — Free forever. Your data stays in YOUR Drive.
-
----
-
-*Built with ☕ and frustration by students who lost their notes one too many times.*
+MIT — Free forever. Your data stays in **your** Drive.
